@@ -78,6 +78,10 @@ input[type=checkbox]{width:auto}
 .sp{fill:rgba(255,122,46,.28);stroke:#ff7a2e;stroke-width:2;vector-effect:non-scaling-stroke}
 .ml{fill:rgba(220,60,60,.13);stroke:rgba(220,60,60,.6);stroke-width:2;vector-effect:non-scaling-stroke}
 .code{font:700 28px "Alegreya SC",Georgia,serif;letter-spacing:.14em;color:var(--acc)}
+.tab{border-radius:6px 6px 0 0}
+.tab.on{background:var(--acc);border-color:var(--acc);color:var(--panel);font-weight:700}
+#tabs{gap:4px}
+.player #tabs{display:none}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -137,6 +141,7 @@ input[type=checkbox]{width:auto}
   </section>
 </aside>
 <main>
+  <div id="tabs" class="bar"></div>
   <div class="bar">
     <button id="tMove" aria-pressed="true">Figuren bewegen</button>
     <button id="tRul" aria-pressed="false">Lineal</button>
@@ -167,8 +172,8 @@ const $=s=>document.querySelector(s);
 const S={ppm:50,ox:0,oy:0,mode:'euclid',zoom:1,W:1500,H:1000,tokens:[],init:[],snap:'free',mapId:'',enforce:true,melee:false,unit:(()=>{try{return localStorage.getItem('dnd-unit')==='ft'?'ft':'m'}catch(e){return 'm'}})(),tool:'move'};
 let ruler=null,drag=null,rd=false,route=null,db=null,gm=true,cloud=false,tm;
 let spells=[],sp=null;
-try{const j=JSON.parse(localStorage.getItem('dnd-map')||'null');if(j){S.ppm=j.ppm||50;S.ox=j.ox||0;S.oy=j.oy||0;S.mode=j.mode||'euclid';S.snap=j.snap||'free';S.enforce=j.enforce!==false;S.tokens=j.tokens||[];S.init=j.init||[]}}catch(e){}
-const save=()=>{if(cloud){clearTimeout(tm);tm=setTimeout(sync,350);if(role!=='host')return}try{localStorage.setItem('dnd-map',JSON.stringify({ppm:S.ppm,ox:S.ox,oy:S.oy,mode:S.mode,snap:S.snap,enforce:S.enforce,tokens:S.tokens,init:S.init}))}catch(e){}};
+try{const j=JSON.parse(localStorage.getItem('dnd-map')||'null');if(j){S.ppm=j.ppm||50;S.ox=j.ox||0;S.oy=j.oy||0;S.mode=j.mode||'euclid';S.snap=j.snap||'free';S.enforce=j.enforce!==false;S.scenes=j.scenes||null;S.sc=j.sc||null;S.tokens=j.tokens||[];S.init=j.init||[]}}catch(e){}
+const save=()=>{storeScene();if(cloud){clearTimeout(tm);tm=setTimeout(sync,350);if(role!=='host')return}try{localStorage.setItem('dnd-map',JSON.stringify({ppm:S.ppm,ox:S.ox,oy:S.oy,mode:S.mode,snap:S.snap,enforce:S.enforce,tokens:S.tokens,init:S.init,scenes:S.scenes,sc:S.sc}))}catch(e){}};
 const fmt=n=>n.toLocaleString('de-DE',{maximumFractionDigits:1});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const dist=(a,b,dh=0)=>{const dx=Math.abs(a.x-b.x),dy=Math.abs(a.y-b.y);dh=Math.abs(dh);return S.mode==='grid'?Math.max(dx,dy,dh):Math.hypot(dx,dy,dh)};
@@ -313,7 +318,7 @@ $('#ini').addEventListener('change',e=>{
   if(e.target.dataset.act!=='iv')return;const i=S.init.find(x=>x.id===e.target.closest('.irow').dataset.id),v=parseFloat(e.target.value);
   if(i&&!isNaN(v)){i.v=v;save();renderIni()}});
 const sent={},q={};
-const tdoc=t=>({id:t.id,name:t.name,color:t.color,speed:t.speed,x:t.x,y:t.y,used:t.used,dead:!!t.dead,rough:!!t.rough,h:t.h||0,sel:!!t.sel,hist:t.hist||[]});
+const tdoc=t=>({id:t.id,name:t.name,color:t.color,speed:t.speed,x:t.x,y:t.y,used:t.used,dead:!!t.dead,rough:!!t.rough,h:t.h||0,sel:!!t.sel,p:t.p||{},hist:t.hist||[]});
 const idoc=i=>({id:i.id,name:i.name,v:i.v});
 const sd=o=>({ppm:o.ppm,ox:o.ox,oy:o.oy,mode:o.mode,snap:o.snap||'free',W:o.W,H:o.H,enforce:o.enforce!==false});
 let role='local',peer=null,conns=[],hostConn=null,mapBlob=null;
@@ -347,16 +352,19 @@ function applyPut(p,d){
   if(!d){if(i>=0)arr.splice(i,1);delete sent[p]}
   else{let o=i>=0?arr[i]:null;if(!o){o={};arr.push(o)}Object.assign(o,d,tok?{hist:d.hist||[]}:{});sent[p]=JSON.stringify(doc(o))}
   if(tok){if(!drag)renderTokens();renderList()}else renderIni()}
-function showMapBlob(b){
+function clearMap(){const im=$('#img');im.style.display='none';im.removeAttribute('src');$('#empty').style.display='grid';layout();renderTokens()}
+function showMapBlob(b){if(!b){clearMap();return}
   const im=$('#img');
   im.onload=()=>{S.W=im.naturalWidth;S.H=im.naturalHeight;S.zoom=Math.min(1,Math.max(.2,($('#pan').clientWidth-4)/S.W));$('#zoom').value=S.zoom;layout();renderTokens()};
   im.style.display='block';$('#empty').style.display='none';im.src=URL.createObjectURL(b)}
 async function sendMap(c){
-  if(!mapBlob||!c.open)return;
+  if(!c.open)return;if(!mapBlob){c.send({t:'map',none:true});return}
   c.send({t:'map',mime:mapBlob.type||'image/png',buf:await mapBlob.arrayBuffer()})}
 function up(f){
-  mapBlob=f;const im=new Image();
-  im.onload=()=>{S.W=im.naturalWidth;S.H=im.naturalHeight;save();if(role==='host')conns.forEach(sendMap)};
+  const sid=S.sc;mapBlob=f;idb.set(sid,f).catch(()=>{});const im=new Image();
+  im.onload=()=>{S.W=im.naturalWidth;S.H=im.naturalHeight;
+    S.tokens.forEach((t,n)=>{const q=px(t);if(q.x<0||q.y<0||q.x>S.W||q.y>S.H){t.x=Math.floor((S.W-S.ox)/S.ppm/2)+.5+n%6;t.y=Math.floor((S.H-S.oy)/S.ppm/2)+.5}});
+    renderTokens();save();if(role==='host')conns.forEach(sendMap)};
   im.src=URL.createObjectURL(f)}
 function onData(m,c){
   if(!m||!m.t)return;
@@ -364,7 +372,7 @@ function onData(m,c){
   else if(m.t==='put'){
     if(role==='host'){if(!String(m.p).startsWith('tokens/'))return;applyPut(m.p,m.d);netSend(m,c)}
     else applyPut(m.p,m.d)}
-  else if(m.t==='map'&&role==='client')showMapBlob(new Blob([m.buf],{type:m.mime}))}
+  else if(m.t==='map'&&role==='client')showMapBlob(m.none?null:new Blob([m.buf],{type:m.mime}))}
 const CH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',PRE='dndkarte-';
 const netMsg=t=>{$('#netInfo').textContent=t};
 function netUI(code){$('#netIdle').hidden=true;$('#netOn').hidden=false;$('#code').textContent=code}
@@ -406,6 +414,53 @@ function initNet(){
   $('#joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom()});
   $('#cpCode').onclick=async()=>{try{await navigator.clipboard.writeText($('#code').textContent);$('#cpCode').textContent='Kopiert'}catch(e){}};
   if(!window.Peer){$('#netIdle').hidden=true;netMsg('Offline-Modus: Die Verbindungsbibliothek wurde nicht geladen.')}}
+const idb=(()=>{let d;const open=()=>d||(d=new Promise((res,rej)=>{const r=indexedDB.open('dnd-maps',1);r.onupgradeneeded=()=>r.result.createObjectStore('m');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
+  const tx=(mode,f)=>open().then(db=>new Promise((res,rej)=>{const t=db.transaction('m',mode),r=f(t.objectStore('m'));t.oncomplete=()=>res(r.result);t.onerror=()=>rej(t.error)}));
+  return{get:k=>tx('readonly',x=>x.get(k)),set:(k,v)=>tx('readwrite',x=>x.put(v,k)),del:k=>tx('readwrite',x=>x.delete(k))}})();
+const scene=id=>S.scenes.find(x=>x.id===id);
+function storeScene(){const c=S.scenes&&scene(S.sc);if(c)Object.assign(c,{ppm:S.ppm,ox:S.ox,oy:S.oy,W:S.W,H:S.H})}
+function renderTabs(){
+  $('#tabs').innerHTML=S.scenes.map(c=>`<button class="tab${c.id===S.sc?' on':''}" data-id="${c.id}">${esc(c.name)}</button>`).join('')
+    +'<button id="addSc">+ Neue Karte</button><button id="renSc">Umbenennen</button><button id="delSc">Löschen</button>'}
+async function gotoScene(id){
+  if(id===S.sc||!scene(id))return;
+  storeScene();const old=S.sc;
+  if(scene(old))S.tokens.forEach(t=>{t.p=t.p||{};t.p[old]={x:t.x,y:t.y}});
+  S.sc=id;const c=scene(id);
+  Object.assign(S,{ppm:c.ppm,ox:c.ox,oy:c.oy,W:c.W,H:c.H});
+  S.tokens.forEach((t,n)=>{const q=(t.p||{})[id];
+    if(q){t.x=q.x;t.y=q.y}else{t.x=Math.floor((S.W-S.ox)/S.ppm/2)+.5+n%6;t.y=Math.floor((S.H-S.oy)/S.ppm/2)+.5}t.hist=[]});
+  ruler=null;spells=[];drawSpells();
+  $('#ppm').value=S.ppm;$('#ox').value=S.ox;$('#oy').value=S.oy;
+  renderTabs();layout();renderTokens();renderList();
+  let b=null;try{b=await idb.get(id)}catch(e){}
+  if(S.sc!==id)return;
+  mapBlob=b||null;
+  if(b)showMapBlob(b);else clearMap();
+  save();
+  if(role==='host')conns.forEach(sendMap)}
+function addScene(){
+  const id='s'+Date.now().toString(36);
+  S.scenes.push({id,name:'Karte '+(S.scenes.length+1),ppm:50,ox:0,oy:0,W:1500,H:1000});
+  gotoScene(id)}
+function renameScene(){
+  const c=scene(S.sc),n=prompt('Name der Karte',c.name);
+  if(n&&n.trim()){c.name=n.trim();renderTabs();save()}}
+function delScene(){
+  if(S.scenes.length<2){alert('Mindestens eine Karte muss bleiben.');return}
+  const c=scene(S.sc);if(!confirm('Karte „'+c.name+'“ wirklich löschen?'))return;
+  const id=c.id;S.scenes=S.scenes.filter(x=>x.id!==id);idb.del(id).catch(()=>{});
+  S.tokens.forEach(t=>{if(t.p)delete t.p[id]});
+  gotoScene(S.scenes[0].id)}
+function initScenes(){
+  if(!S.scenes||!S.scenes.length){S.scenes=[{id:'s1',name:'Karte 1',ppm:S.ppm,ox:S.ox,oy:S.oy,W:S.W,H:S.H}];S.sc='s1'}
+  else{const c=scene(S.sc)||S.scenes[0];S.sc=c.id;Object.assign(S,{ppm:c.ppm,ox:c.ox,oy:c.oy,W:c.W,H:c.H})}
+  renderTabs();
+  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.classList.contains('tab'))gotoScene(b.dataset.id);
+    else if(b.id==='addSc')addScene();else if(b.id==='renSc')renameScene();else if(b.id==='delSc')delScene()});
+  idb.get(S.sc).then(b=>{if(b){mapBlob=b;showMapBlob(b)}}).catch(()=>{})}
+initScenes();
 nextColor();layout();renderTokens();renderList();renderIni();initNet();
 function limit(t,s,p){if(!S.enforce)return p;const R=t.speed-t.used,d=cost(t,s,p);if(d<=R+1e-9||d===0)return p;const f=Math.max(0,R)/d;return{x:s.x+(p.x-s.x)*f,y:s.y+(p.y-s.y)*f}}
 function rlim(p){if(!S.enforce||!route)return p;const t=route.t,l=route.pts[route.pts.length-1],d=dist(l,p)*(t.rough?2:1),R=t.speed-t.used-routeLen(route.pts);if(d<=R+1e-9||d===0)return p;const f=Math.max(0,R)/d;return{x:l.x+(p.x-l.x)*f,y:l.y+(p.y-l.y)*f}}
