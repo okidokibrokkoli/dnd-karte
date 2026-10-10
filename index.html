@@ -82,6 +82,15 @@ input[type=checkbox]{width:auto}
 .tab.on{background:var(--acc);border-color:var(--acc);color:var(--panel);font-weight:700}
 #tabs{gap:4px}
 .player #tabs{display:none}
+#toasts{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;width:min(92vw,520px);pointer-events:none}
+.toast{pointer-events:auto;cursor:pointer;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);border:3px solid #fff;text-shadow:0 1px 2px rgba(0,0,0,.5);animation:pop .35s ease-out;transition:opacity .4s}
+.toast b{display:block;font:700 24px "Alegreya SC",Georgia,serif;letter-spacing:.02em}
+.toast span{font-size:19px;font-weight:700}
+.toast.enter{background:#d9731a}
+.toast.leave{background:#c23a28}
+.toast.out{opacity:0}
+@keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -167,6 +176,7 @@ input[type=checkbox]{width:auto}
   </div></div>
 </main>
 </div>
+<div id="toasts" aria-live="assertive"></div>
 <script>
 const $=s=>document.querySelector(s);
 const S={ppm:50,ox:0,oy:0,mode:'euclid',zoom:1,W:1500,H:1000,tokens:[],init:[],snap:'free',mapId:'',enforce:true,melee:false,unit:(()=>{try{return localStorage.getItem('dnd-unit')==='ft'?'ft':'m'}catch(e){return 'm'}})(),tool:'move'};
@@ -225,7 +235,7 @@ function renderTokens(){
       tip.textContent=tt(t,total,bad);place(tip,p,-s/2-8);el.classList.toggle('over',bad)});
     const end=ev=>{
       if(!drag||drag.el!==el)return;const d=cost(t,drag.start,drag.cur),moved=Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)>5;
-      if(moved&&d>0){t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});t.used+=d;t.x=drag.cur.x;t.y=drag.cur.y}else if(!moved){t.sel=!t.sel;el.classList.toggle('sel',!!t.sel)}setPos(el,t);
+      if(moved&&d>0){meleeCheck(t,[drag.start,drag.cur]);t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});t.used+=d;t.x=drag.cur.x;t.y=drag.cur.y}else if(!moved){t.sel=!t.sel;el.classList.toggle('sel',!!t.sel)}setPos(el,t);
       drag=null;el.style.cursor='';$('#path').innerHTML='';$('#tip').style.display='none';drawMelee();
       el.classList.toggle('over',over(t));save();renderList()};
     el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
@@ -295,7 +305,7 @@ function drawRoute(){
   tip.textContent=tt(t,total,bad);place(tip,route.hover,-tokSize()/2-8)}
 function confirmRoute(){
   if(!route)return;const t=route.t,pts=route.pts,last=pts[pts.length-1],len=routeLen(pts);
-  if(len>0){t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});t.used+=len;t.x=last.x;t.y=last.y}
+  if(len>0){meleeCheck(t,pts);t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});t.used+=len;t.x=last.x;t.y=last.y}
   endRoute();save();renderTokens();renderList()}
 function cancelRoute(){if(route)endRoute()}
 function endRoute(){route=null;$('#stage').classList.remove('routing');$('#rOk').hidden=true;$('#rNo').hidden=true;drawRoute()}
@@ -366,13 +376,34 @@ function up(f){
     S.tokens.forEach((t,n)=>{const q=px(t);if(q.x<0||q.y<0||q.x>S.W||q.y>S.H){t.x=Math.floor((S.W-S.ox)/S.ppm/2)+.5+n%6;t.y=Math.floor((S.H-S.oy)/S.ppm/2)+.5}});
     renderTokens();save();if(role==='host')conns.forEach(sendMap)};
   im.src=URL.createObjectURL(f)}
+function showToast(e){
+  const enter=e&&e.k==='enter',d=document.createElement('div');
+  d.className='toast '+(enter?'enter':'leave');
+  d.innerHTML=enter?`<b>Entering Melee Range</b><span>${esc(e.a)} → ${esc(e.b)}</span>`
+    :`<b>Leaving Opportunity Range</b><span>${esc(e.a)} verlässt die Reichweite von ${esc(e.b)}</span>`;
+  const rm=()=>{d.classList.add('out');setTimeout(()=>d.remove(),400)};
+  d.addEventListener('click',rm);$('#toasts').appendChild(d);setTimeout(rm,7000)}
+function meleeCheck(t,pts){
+  if(t.dead)return;
+  const R=1.5,ev=[];
+  S.tokens.forEach(o=>{
+    if(o===t||o.dead)return;
+    const dh=(t.h||0)-(o.h||0),inr=p=>dist(p,o,dh)<=R+1e-9;
+    let st=inr(pts[0]);
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1],b=pts[i],L=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(1,Math.ceil(L/.1));
+      for(let k=1;k<=n;k++){
+        const now=inr({x:a.x+(b.x-a.x)*k/n,y:a.y+(b.y-a.y)*k/n});
+        if(now!==st){ev.push({k:now?'enter':'leave',a:String(t.name),b:String(o.name)});st=now}}}});
+  if(ev.length){const e6=ev.slice(0,6);e6.forEach(showToast);netSend({t:'alert',ev:e6})}}
 function onData(m,c){
   if(!m||!m.t)return;
   if(m.t==='full'){applyTokens(m.tokens);applyInit(m.init);applySet(m.set)}
   else if(m.t==='put'){
     if(role==='host'){if(!String(m.p).startsWith('tokens/'))return;applyPut(m.p,m.d);netSend(m,c)}
     else applyPut(m.p,m.d)}
-  else if(m.t==='map'&&role==='client')showMapBlob(m.none?null:new Blob([m.buf],{type:m.mime}))}
+  else if(m.t==='map'&&role==='client')showMapBlob(m.none?null:new Blob([m.buf],{type:m.mime}));
+  else if(m.t==='alert'&&Array.isArray(m.ev)){m.ev.slice(0,6).forEach(showToast);if(role==='host')netSend(m,c)}}
 const CH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',PRE='dndkarte-';
 const netMsg=t=>{$('#netInfo').textContent=t};
 function netUI(code){$('#netIdle').hidden=true;$('#netOn').hidden=false;$('#code').textContent=code}
