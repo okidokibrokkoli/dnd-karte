@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kampagne</title>
+<style>
+:root{--bg:#f1e7d0;--panel:#fffaf0;--ink:#2b2118;--mute:#7a6a58;--line:#cdbb9a;--acc:#8b1e1e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1511;--panel:#251e18;--ink:#eadfc9;--mute:#a69782;--line:#4a3d30;--acc:#d9534f}}
+:root[data-theme="dark"]{--bg:#1a1511;--panel:#251e18;--ink:#eadfc9;--mute:#a69782;--line:#4a3d30;--acc:#d9534f}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,'Times New Roman',serif}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:1.3rem;letter-spacing:.02em}
+.bar{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{font:inherit;font-size:.9rem;padding:7px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer}
+button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.danger{color:var(--acc)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;padding:16px 18px;max-width:1300px;margin:0 auto}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+#mapbox{position:relative;border:1px solid var(--line);border-radius:8px;overflow:auto;background:var(--panel);min-height:200px;max-height:80vh;touch-action:pan-x pan-y}#stage{position:relative;width:100%}
+#mapbox.place{cursor:crosshair}
+#mapimg{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+.empty{padding:60px 20px;text-align:center;color:var(--mute)}
+.pin{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:rgba(var(--r),.25);border:2px solid rgba(var(--r),.85);--r:229,50,45;animation:pulse 1.6s infinite;cursor:pointer}
+.pin.done{--r:47,170,86}
+.pin.sel{outline:3px solid var(--ink);outline-offset:2px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(var(--r),.75)}100%{box-shadow:0 0 0 18px rgba(var(--r),0)}}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;align-self:start}
+aside h2{margin:0 0 8px;font-size:1.15rem}
+label{display:block;font-size:.85rem;color:var(--mute);margin:10px 0 3px}
+input[type=text],textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+textarea{min-height:110px;resize:vertical}
+.chk{display:flex;gap:8px;align-items:center;margin-top:10px;color:var(--ink);font-size:.95rem}
+.mute{color:var(--mute)}
+.badge{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.txt{white-space:pre-wrap}
+#warn{color:var(--acc);font-size:.85rem;padding:0 18px}
+[hidden]{display:none!important}
+.mtool{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.mtool input{flex:1;min-width:180px;max-width:320px;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.tw{overflow:auto;max-height:72vh;border:1px solid var(--line);border-radius:8px}
+.mt{border-collapse:separate;border-spacing:0;font-size:.85rem;width:100%}
+.mt th,.mt td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px 5px;text-align:center;background:var(--panel)}
+.mt thead th{position:sticky;top:0;z-index:2}
+.mt thead tr+tr th{top:30px}
+.mt .sc{position:sticky;left:0;z-index:3;min-width:170px;text-align:left}
+.mt thead .sc{z-index:4}
+.mt tr.dup td{background:rgba(217,160,40,.18)}
+.mt input[type=text]{width:100%;font:inherit;font-size:.85rem;padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.mt td input.ds{min-width:220px}
+.rh{cursor:pointer;border-top:3px solid var(--g)!important;min-width:34px;font-weight:bold}
+.rh.act{background:var(--g)!important;color:#fff}
+#hN,#hC{cursor:pointer}
+.chip{display:inline-block;font-size:.8rem;font-weight:bold;padding:1px 8px;border-radius:99px;background:var(--g);color:#fff}
+.pwrap{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+@media(max-width:820px){.pwrap{grid-template-columns:1fr}}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.pcard h2{margin:0 0 6px;font-size:1.15rem}.pcard h3{margin:14px 0 6px;font-size:.95rem}
+.rg{display:flex;flex-wrap:wrap;gap:6px}
+.rb{border-color:var(--g)}
+.rb.sel{background:var(--g);color:#fff}
+.rcell{cursor:pointer;user-select:none;min-width:34px;height:26px}
+.rcell.has{background:var(--g)!important;color:#fff;font-weight:bold}
+#pRes .chip{cursor:pointer}
+.ok{padding:8px 10px;margin-top:8px;border-left:3px solid var(--acc);background:var(--bg);border-radius:4px}
+#netbar{padding:8px 18px;font-size:.9rem;border-bottom:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#netbar input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);text-transform:uppercase;max-width:140px}
+</style><script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>⚔ Kampagne</h1><div class='bar'><button id='tMap' class='on'>Karte</button><button id='tMag'>Magie</button></div>
+  <div class="bar">
+    <button id="bGm" class="on">Spielleiter</button>
+    <button id="bPl">Spieler</button><span class="bar" id="zoomBar"><button id="zOut" title="Verkleinern">−</button><button id="zReset" title="Zurücksetzen">100 %</button><button id="zIn" title="Vergrößern">+</button></span>
+    <span id="gmTools" class="bar">
+      <label class="btn" style="margin:0;color:var(--ink)">Karte hochladen<input id="file" type="file" accept="image/*" hidden></label>
+      <button id="bPlace">+ Quest-Punkt setzen</button>
+    </span>
+  </div>
+</header><div id='netbar'></div>
+<div id="warn"></div>
+<main id="mapView">
+  <div id="mapbox"><div class="empty" id="empty">Noch keine Karte. Lade als Spielleiter ein Inkarnate-Bild hoch.</div></div>
+  <aside id="panel"></aside>
+</main><section id="magicView" hidden style="padding:16px 18px;max-width:1400px;margin:0 auto"></section>
+<script>
+var S={map:null,pins:[],gm:true,place:false,sel:null};
+var box=document.getElementById('mapbox'),panel=document.getElementById('panel'),warn=document.getElementById('warn');
+function load(){try{var d=JSON.parse(localStorage.getItem('questkarte')||'null');if(d){S.map=d.map;S.pins=d.pins||[]}}catch(e){}}
+function save(){if(window.NET&&NET.role==='host')NET.sync();try{localStorage.setItem('questkarte',JSON.stringify({map:S.map,pins:S.pins}));warn.textContent=''}catch(e){warn.textContent='Speichern im Browser nicht möglich (Bild evtl. zu groß). Änderungen gehen beim Neuladen verloren.'}}
+function esc(s){return String(s||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function drawMap(){
+  var sl=box.scrollLeft,stp=box.scrollTop;
+  box.innerHTML='';
+  if(!S.map){box.innerHTML='<div class="empty">Noch keine Karte. Lade als Spielleiter ein Inkarnate-Bild hoch.</div>';return}
+  var st=document.createElement('div');st.id='stage';st.style.width=(Z*100)+'%';var im=document.createElement('img');im.id='mapimg';im.draggable=false;im.onload=function(){box.scrollLeft=sl;box.scrollTop=stp};im.src=S.map;st.appendChild(im);box.appendChild(st);
+  S.pins.forEach(function(p){
+    var d=document.createElement('div');
+    d.className='pin'+(p.done?' done':'')+(S.sel===p.id?' sel':'');
+    d.style.left=p.x+'%';d.style.top=p.y+'%';d.title=S.gm?(p.title||'Quest'):'';
+    d.addEventListener('pointerdown',function(e){e.stopPropagation();S.sel=p.id;S.place=false;
+      if(S.gm){drag(e,p,d)}else{drawPins();drawPanel()}
+      syncUI()});
+    st.appendChild(d)});box.scrollLeft=sl;box.scrollTop=stp;
+}
+function drawPins(){drawMap()}
+function drag(e,p,d){
+  var moved=false;
+  function mv(ev){moved=true;var r=document.getElementById('stage').getBoundingClientRect();
+    p.x=Math.min(100,Math.max(0,(ev.clientX-r.left)/r.width*100));
+    p.y=Math.min(100,Math.max(0,(ev.clientY-r.top)/r.height*100));
+    d.style.left=p.x+'%';d.style.top=p.y+'%'}
+  function up(){document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);
+    if(moved)save();drawMap();drawPanel()}
+  document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up);
+}
+box.addEventListener('pointerdown',function(e){
+  if(!S.gm||!S.place||!S.map)return;
+  var r=document.getElementById('stage').getBoundingClientRect();
+  var p={id:'q'+Date.now(),x:(e.clientX-r.left)/r.width*100,y:(e.clientY-r.top)/r.height*100,title:'Neue Quest',client:'',text:'',unlocked:false,done:false};
+  S.pins.push(p);S.sel=p.id;S.place=false;save();syncUI();drawMap();drawPanel()});
+function cur(){return S.pins.filter(function(p){return p.id===S.sel})[0]}
+function drawPanel(){
+  var p=cur();
+  if(!p){panel.innerHTML='<h2>Quests</h2><p class="mute">'+(S.gm?'Wähle einen Punkt oder setze mit „+ Quest-Punkt setzen“ einen neuen auf der Karte. Punkte lassen sich per Drag verschieben.':'Klicke auf einen pulsierenden Punkt auf der Karte.')+'</p>';return}
+  if(S.gm){
+    panel.innerHTML='<h2>Quest bearbeiten</h2>'+
+    '<label>Titel</label><input type="text" id="fT" value="'+esc(p.title)+'">'+
+    '<label>Auftraggeber</label><input type="text" id="fC" value="'+esc(p.client)+'">'+
+    '<label>Inhalt der Quest</label><textarea id="fX">'+esc(p.text)+'</textarea>'+
+    '<label class="chk"><input type="checkbox" id="fU"'+(p.unlocked?' checked':'')+'> Für Spieler freigeschaltet (Auftraggeber &amp; Inhalt sichtbar)</label>'+
+    '<label class="chk"><input type="checkbox" id="fD"'+(p.done?' checked':'')+'> Quest erledigt (Punkt wird grün)</label>'+
+    '<div class="row"><button class="danger" id="fDel">Punkt löschen</button></div>';
+    var g=function(i){return document.getElementById(i)};
+    g('fT').oninput=function(){p.title=this.value;save()};
+    g('fC').oninput=function(){p.client=this.value;save()};
+    g('fX').oninput=function(){p.text=this.value;save()};
+    g('fU').onchange=function(){p.unlocked=this.checked;save()};
+    g('fD').onchange=function(){p.done=this.checked;save();drawMap()};
+    g('fDel').onclick=function(){S.pins=S.pins.filter(function(q){return q!==p});S.sel=null;save();drawMap();drawPanel()};
+  }else if(!p.unlocked){
+    panel.innerHTML='<h2>Unbekannt</h2><p class="mute">Über diesen Ort weißt du noch nichts.</p>';
+  }else{
+    panel.innerHTML='<h2>'+esc(p.title)+'</h2><span class="badge">'+(p.done?'Erledigt':'Offen')+'</span>'+
+    '<label>Auftraggeber</label><div>'+(esc(p.client)||'–')+'</div>'+
+    '<label>Inhalt</label><div class="txt">'+(esc(p.text)||'–')+'</div>';
+  }
+}
+function syncUI(){
+  document.getElementById('bGm').className=S.gm?'on':'';
+  document.getElementById('bPl').className=S.gm?'':'on';
+  document.getElementById('gmTools').style.display=(S.gm&&TAB==='map')?'flex':'none';document.getElementById('zoomBar').style.display=TAB==='map'?'flex':'none';
+  document.getElementById('bPlace').className=S.place?'on':'';
+  box.className=S.place?'place':'';
+}
+document.getElementById('bGm').onclick=function(){S.gm=true;S.sel=null;syncUI();drawMap();drawPanel()};
+document.getElementById('bPl').onclick=function(){S.gm=false;S.place=false;S.sel=null;syncUI();drawMap();drawPanel()};
+document.getElementById('bPlace').onclick=function(){if(!S.map){warn.textContent='Lade zuerst eine Karte hoch.';return}warn.textContent='';S.place=!S.place;syncUI()};
+document.getElementById('file').onchange=function(){
+  var f=this.files[0];if(!f)return;
+  var fr=new FileReader();
+  fr.onload=function(){var im=new Image();im.onload=function(){
+    var m=1800,k=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    S.map=c.toDataURL('image/jpeg',.85);save();drawMap();drawPanel()};im.src=fr.result};
+  fr.readAsDataURL(f);this.value='';
+};
+var Z=1;
+function setZ(z,cx,cy){
+  z=Math.min(5,Math.max(1,z));var st=document.getElementById('stage');
+  document.getElementById('zReset').textContent=Math.round(z*100)+' %';
+  if(!st){Z=z;return}
+  var r=box.getBoundingClientRect(),ox=cx==null?r.width/2:cx-r.left,oy=cy==null?r.height/2:cy-r.top;
+  var fx=(box.scrollLeft+ox)/st.offsetWidth,fy=(box.scrollTop+oy)/st.offsetHeight;
+  Z=z;st.style.width=(Z*100)+'%';
+  box.scrollLeft=fx*st.offsetWidth-ox;box.scrollTop=fy*st.offsetHeight-oy}
+document.getElementById('zIn').onclick=function(){setZ(Z*1.3)};
+document.getElementById('zOut').onclick=function(){setZ(Z/1.3)};
+document.getElementById('zReset').onclick=function(){setZ(1)};
+box.addEventListener('wheel',function(e){if(e.ctrlKey||e.metaKey){e.preventDefault();setZ(Z*(e.deltaY<0?1.15:1/1.15),e.clientX,e.clientY)}},{passive:false});
+box.addEventListener('pointerdown',function(e){
+  if(e.pointerType!=='mouse'||S.place||e.button!==0||Z<=1||e.target===box)return;
+  var x=e.clientX,y=e.clientY,l0=box.scrollLeft,t0=box.scrollTop;
+  function mv(ev){box.scrollLeft=l0-(ev.clientX-x);box.scrollTop=t0-(ev.clientY-y)}
+  function up(){document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);box.style.cursor=''}
+  box.style.cursor='grabbing';document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up)});
+var TAB='map',MF={q:'',req:{},sort:'name',dir:1},PSEL=[],SP=[],FD=[];
+try{SP=JSON.parse(localStorage.getItem('qk_spells')||'[]');FD=JSON.parse(localStorage.getItem('qk_found')||'[]')}catch(e){}
+var seeded=false;try{seeded=!!localStorage.getItem('qk_seed1')}catch(e){}
+if(!seeded){
+  'Acid Splash|A,W;Blade Ward|Pc,E;Chill Touch|N,To;Dancing Lights|Lx,M;Druidcraft|E,E;Eldritch Blast|Fo,Lx;Elementalism|eF,W,Ae,E;Fire Bolt|F,Lx;Friends|Md,Lf;Guidance|R,To;Light|Lx;Mage Hand|To,To;Mending|Lf,To;Message|Md;Mind Sliver|Md,Ps;Minor Illusion|I;Poison Spray|P,W;Prestidigitation|I,I;Produce Flame|F;Ray of Frost|C,W;Resistance|Pc;Sacred Flame|R,Ae;Shillelagh|E,Fo;Shocking Grasp|L,To;Sorcerous Burst|Lx,Fo;Spare the Dying|N,Lf;Starry Whisp|R,Lx;Thaumaturgy|I,eF;Thorn Whip|E,To;Thunderclap|T,E;Toll the Dead|N,Ae;True Strike|Md,Da;Vicious Mockery|Md,M,P;Word of Radiance|R,M;Alarm|Ae,Md'.split(';').forEach(function(l,i){var p=l.split('|');SP.push({id:'seed'+i,name:p[0],desc:'',runes:p[1].split(','),on:true})});
+  try{localStorage.setItem('qk_seed1','1')}catch(e){}
+  saveM();
+}
+var mg=false;try{mg=!!localStorage.getItem('qk_mig2')}catch(e){}
+if(!mg){[['seed4','E'],['seed11','To'],['seed17','I']].forEach(function(m){SP.forEach(function(s){if(s.id===m[0]&&s.runes.length===1&&s.runes[0]===m[1])s.runes.push(m[1])})});try{localStorage.setItem('qk_mig2','1')}catch(e){}saveM()}
+var G={d:['Schadens-Runen','#c0392b'],e:['Element-Runen','#2f7fc1'],o:['Essenz-Runen','#8e44ad']};
+var R=[['C','C','Cold','d'],['F','F','Fire','d'],['L','L','Lightning','d'],['T','T','Thunder','d'],['P','P','Poison','d'],['A','A','Acid','d'],['N','N','Necrotic','d'],['R','R','Radiant','d'],['Fo','Fo','Force','d'],['Ps','Ps','Psychic','d'],['eF','F','Fire','e'],['W','W','Water','e'],['Ae','Ae','Air','e'],['E','E','Earth','e'],['Pc','Pc','Protection','o'],['Lf','Lf','Life','o'],['D','D','Death','o'],['M','M','Music','o'],['Lx','Lx','Light','o'],['Da','Da','Darkness','o'],['To','To','Touch','o'],['Md','Md','Mind','o'],['I','I','Illusion','o']];
+var mv=document.getElementById('magicView'),$m=function(i){return document.getElementById(i)};
+function saveM(){try{localStorage.setItem('qk_spells',JSON.stringify(SP));localStorage.setItem('qk_found',JSON.stringify(FD))}catch(e){}}
+function esc2(s){return esc(s).replace(/'/g,'&#39;')}
+function rn(id){return R.filter(function(r){return r[0]===id})[0]}
+function chip(id){var r=rn(id);return `<span class='chip' data-r='${id}' style='--g:${G[r[3]][1]}' title='${r[2]}'>${r[1]}</span>`}
+function key(a){return a.slice().sort().join(',')}
+function setTab(t){TAB=t;$m('tMap').className=t==='map'?'on':'';$m('tMag').className=t==='mag'?'on':'';$m('mapView').hidden=t!=='map';mv.hidden=t!=='mag';syncUI();drawMagic()}
+$m('tMap').onclick=function(){setTab('map')};$m('tMag').onclick=function(){setTab('mag')};
+['bGm','bPl'].forEach(function(i){$m(i).addEventListener('click',drawMagic)});
+function drawMagic(){
+  if(TAB!=='mag')return;
+  if(!S.gm){drawPlayer();return}
+  mv.onclick=null;
+  mv.innerHTML=`<div class='mtool'><input type='text' id='mQ' placeholder='Zauber suchen …' value='${esc2(MF.q)}'><button id='mAdd' class='on'>+ Neuer Zauber</button><button id='mRes'>Filter zurücksetzen</button><button id='mIO'>Sichern / Laden</button><span class='mute' id='mCnt'></span></div><div id='mBox' hidden class='ok' style='margin-bottom:10px'><textarea id='mTxt' style='min-height:90px' placeholder='Hier erscheint der Export-Text. Zum Importieren: Text hier einfügen.'></textarea><div class='row'><button id='mExp'>Aktuelle Zauber als Text anzeigen</button><button id='mImp' class='danger'>Text importieren (ersetzt alle Zauber)</button></div><p class='mute' id='mMsg' style='margin:6px 0 0;font-size:.85rem'></p></div><p class='mute' style='margin:0 0 8px;font-size:.85rem'>Klicke in eine Zelle, um eine Rune zu setzen (erneut klicken = Rune mehrfach, nach 4× wieder leer). Klicke auf eine Rune in der Kopfzeile, um nur Zauber mit dieser Rune zu zeigen (mehrere Runen: alle müssen enthalten sein). Klick auf „Zauber“ oder „Σ“ sortiert. Gelb markierte Zeilen haben dieselbe Runen-Kombination.</p><div id='mTbl' class='tw'></div>`;
+  $m('mQ').oninput=function(){MF.q=this.value;drawTable()};
+  $m('mAdd').onclick=function(){MF.q='';MF.req={};var s={id:'s'+Date.now(),name:'Neuer Zauber',desc:'',runes:[],on:true};SP.push(s);saveM();drawMagic();var i=mv.querySelector(`tr[data-id='${s.id}'] .nm`);if(i){i.focus();i.select()}};
+  $m('mRes').onclick=function(){MF.q='';MF.req={};drawMagic()};
+  $m('mIO').onclick=function(){$m('mBox').hidden=!$m('mBox').hidden};
+  $m('mExp').onclick=function(){var t=$m('mTxt');t.value=JSON.stringify(SP);t.focus();t.select();$m('mMsg').textContent=SP.length+' Zauber als Text erzeugt. Alles markieren (Strg+A) und kopieren (Strg+C).'};
+  $m('mImp').onclick=function(){try{var a=JSON.parse($m('mTxt').value);if(!Array.isArray(a)||!a.every(function(s){return s&&typeof s.name==='string'&&Array.isArray(s.runes)}))throw 0;a.forEach(function(s){s.id=s.id||'s'+Math.random().toString(36).slice(2);s.desc=s.desc||'';s.on=s.on!==false});SP=a;saveM();drawMagic()}catch(e){$m('mMsg').textContent='Das ist kein gültiger Export-Text.'}};
+  drawTable();
+}
+function drawTable(){
+  var cnt={},ids=Object.keys(MF.req).filter(function(k){return MF.req[k]}),q=MF.q.toLowerCase();
+  SP.forEach(function(s){var k=key(s.runes);cnt[k]=(cnt[k]||0)+1});
+  var L=SP.filter(function(s){return ids.every(function(i){return s.runes.indexOf(i)>-1})&&(s.name+' '+s.desc).toLowerCase().indexOf(q)>-1});
+  L.sort(function(a,b){return MF.sort==='cnt'?(a.runes.length-b.runes.length)*MF.dir:a.name.localeCompare(b.name,'de')*MF.dir});
+  var ar=function(k){return MF.sort===k?(MF.dir>0?' ▲':' ▼'):''};
+  var h=`<table class='mt'><thead><tr><th class='sc' id='hN' rowspan='2'>Zauber${ar('name')}</th>`;
+  ['d','e','o'].forEach(function(g){h+=`<th colspan='${R.filter(function(r){return r[3]===g}).length}' style='background:${G[g][1]};color:#fff'>${G[g][0]}</th>`});
+  h+=`<th id='hC' rowspan='2'>Σ${ar('cnt')}</th><th rowspan='2'>Beschreibung</th><th rowspan='2' title='Für Spieler entdeckbar'>Aktiv</th><th rowspan='2'></th></tr><tr>`;
+  R.forEach(function(r){h+=`<th class='rh${MF.req[r[0]]?' act':''}' data-r='${r[0]}' title='${r[2]}' style='--g:${G[r[3]][1]}'>${r[1]}</th>`});
+  h+='</tr></thead><tbody>';
+  L.forEach(function(s){
+    h+=`<tr data-id='${s.id}'${cnt[key(s.runes)]>1?` class='dup' title='Gleiche Runen-Kombination wie ein anderer Zauber'`:''}><td class='sc'><input type='text' class='nm' value='${esc2(s.name)}'></td>`;
+    R.forEach(function(r){var c=s.runes.filter(function(x){return x===r[0]}).length;h+=`<td class='rcell${c?' has':''}' data-r='${r[0]}' style='--g:${G[r[3]][1]}'>${c?(c===1?'✓':c):''}</td>`});
+    h+=`<td>${s.runes.length}</td><td><input type='text' class='ds' value='${esc2(s.desc)}'></td><td><input type='checkbox' class='ac'${s.on?' checked':''}></td><td><button class='danger del'>×</button></td></tr>`});
+  h+='</tbody></table>';
+  var t=$m('mTbl'),st0=t.scrollTop,sl0=t.scrollLeft;t.innerHTML=h;t.scrollTop=st0;t.scrollLeft=sl0;
+  $m('mCnt').textContent=L.length+' von '+SP.length+' Zaubern';
+  function sp(e){var tr=e.target.closest('tr');return tr&&SP.filter(function(s){return s.id===tr.dataset.id})[0]}
+  t.onclick=function(e){var el=e.target,th=el.closest('th');
+    if(th&&th.dataset.r){MF.req[th.dataset.r]=!MF.req[th.dataset.r];drawTable()}
+    else if(th&&(th.id==='hN'||th.id==='hC')){var k=th.id==='hN'?'name':'cnt';MF.dir=MF.sort===k?-MF.dir:1;MF.sort=k;drawTable()}
+    else if(el.closest('td.rcell')){var cl=el.closest('td.rcell'),s=sp(e),rid=cl.dataset.r,n=s.runes.filter(function(x){return x===rid}).length,m=(n+1)%5;s.runes=s.runes.filter(function(x){return x!==rid});for(var i=0;i<m;i++)s.runes.push(rid);saveM();drawTable()}
+    else if(el.classList.contains('del')){var s=sp(e);SP=SP.filter(function(x){return x!==s});saveM();drawTable()}};
+  t.onchange=function(e){var s=sp(e),el=e.target;if(!s)return;
+    if(el.classList.contains('rc')){var i=s.runes.indexOf(el.dataset.r);if(el.checked&&i<0)s.runes.push(el.dataset.r);if(!el.checked&&i>-1)s.runes.splice(i,1);saveM();drawTable()}
+    else if(el.classList.contains('ac')){s.on=el.checked;saveM()}};
+  t.oninput=function(e){var s=sp(e),el=e.target;if(!s)return;if(el.classList.contains('nm')){s.name=el.value;saveM()}else if(el.classList.contains('ds')){s.desc=el.value;saveM()}};
+}
+function drawPlayer(){
+  var h=`<div class='pwrap'><section class='pcard'><h2>Runen kombinieren</h2><p class='mute'>Wähle Runen aus (mehrfaches Klicken fügt eine Rune mehrfach hinzu) und sieh, was entsteht. Zum Entfernen klicke im Ergebnis auf eine Rune.</p>`;
+  ['d','e','o'].forEach(function(g){h+=`<h3 style='color:${G[g][1]}'>${G[g][0]}</h3><div class='rg'>`;R.filter(function(r){return r[3]===g}).forEach(function(r){var n=PSEL.filter(function(x){return x===r[0]}).length;h+=`<button class='rb${n?' sel':''}' data-r='${r[0]}' style='--g:${G[g][1]}'>${r[2]} <b>(${r[1]})</b>${n>1?' ×'+n:''}</button>`});h+='</div>'});
+  h+=`<div class='row'><button id='pClr'>Alle abwählen</button></div></section><section class='pcard'><h2>Ergebnis</h2><div id='pRes'></div><h3>Entdeckte Zauber</h3><div id='pFnd'></div></section></div>`;
+  mv.innerHTML=h;
+  mv.onclick=function(e){var b=e.target.closest('.rb');
+    if(b){if(PSEL.length<12)PSEL.push(b.dataset.r);drawPlayer()}else if(e.target.closest('#pRes .chip')){var ci=PSEL.indexOf(e.target.closest('#pRes .chip').dataset.r);if(ci>-1)PSEL.splice(ci,1);drawPlayer()}
+    else if(e.target.id==='pClr'){PSEL=[];drawPlayer()}};
+  showRes();
+}
+function showRes(){if(NET.role==='guest'){NET.ask();return}
+  var ex=PSEL.length?SP.filter(function(s){return s.on&&key(s.runes)===key(PSEL)}):[];
+  $m('pRes').innerHTML=!PSEL.length?`<p class='mute'>Noch keine Runen gewählt.</p>`:`<div>${PSEL.map(function(i){return chip(i)}).join(' ')}</div>`+(ex.length?ex.map(function(s){return `<div class='ok'><b>${esc(s.name)}</b><div class='txt'>${esc(s.desc)}</div></div>`}).join(''):`<p class='mute'>Die Runen verbinden sich zu keinem bekannten Zauber.</p>`);
+  ex.forEach(function(s){if(FD.indexOf(s.id)<0)FD.push(s.id)});if(ex.length)saveM();
+  var f=SP.filter(function(s){return s.on&&FD.indexOf(s.id)>-1});
+  $m('pFnd').innerHTML=f.length?f.map(function(s){return `<div class='ok'><b>${esc(s.name)}</b> ${s.runes.map(function(i){return chip(i)}).join(' ')}</div>`}).join(''):`<p class='mute'>Noch nichts entdeckt.</p>`;
+}
+var NET={role:null,peer:null,conns:[],code:'',conn:null,lastMap:null,lastPins:'',tm:null,found:[],msg:''};
+try{NET.found=JSON.parse(localStorage.getItem('qk_found2')||'[]')}catch(e){}
+NET.st=function(t){NET.msg=t;var n=document.getElementById('netst');if(n)n.textContent=t};
+NET.pub=function(){return S.pins.map(function(p){var o={id:p.id,x:p.x,y:p.y,done:!!p.done,unlocked:!!p.unlocked};if(p.unlocked){o.title=p.title;o.client=p.client;o.text=p.text}return o})};
+NET.sendAll=function(m){NET.conns.forEach(function(c){if(c.open)c.send(m)})};
+NET.full=function(c){c.send({t:'map',map:S.map});c.send({t:'pins',pins:NET.pub()})};
+NET.sync=function(){clearTimeout(NET.tm);NET.tm=setTimeout(function(){
+  if(NET.role!=='host')return;
+  if(S.map!==NET.lastMap){NET.lastMap=S.map;NET.sendAll({t:'map',map:S.map})}
+  var p=JSON.stringify(NET.pub());if(p!==NET.lastPins){NET.lastPins=p;NET.sendAll({t:'pins',pins:JSON.parse(p)})}},300)};
+NET.host=function(){
+  if(!window.Peer){NET.st('PeerJS konnte nicht geladen werden (Internetverbindung?)');NET.drawNet();return}
+  var code='';try{code=localStorage.getItem('qk_room')||''}catch(e){}
+  if(!code){var A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';for(var i=0;i<6;i++)code+=A[Math.floor(Math.random()*A.length)];try{localStorage.setItem('qk_room',code)}catch(e){}}
+  NET.code=code;NET.role='host';NET.st('Öffne Raum …');NET.drawNet();
+  var pr=new Peer('dnd-q-'+code);NET.peer=pr;
+  pr.on('open',function(){NET.st('Raum offen. Dieser Tab muss geöffnet bleiben.');NET.drawNet()});
+  pr.on('error',function(e){
+    if(e.type==='unavailable-id'){NET.role=null;NET.st('Code noch belegt (alter Tab offen?). In etwa 30 Sekunden erneut versuchen.')}
+    else NET.st('Fehler: '+e.type);
+    NET.drawNet()});
+  pr.on('connection',function(c){
+    c.on('open',function(){NET.conns.push(c);NET.full(c);NET.drawNet()});
+    c.on('close',function(){NET.conns=NET.conns.filter(function(x){return x!==c});NET.drawNet()});
+    c.on('data',function(m){if(!m)return;
+      if(m.t==='hello')NET.full(c);
+      if(m.t==='combo'){var k=key(m.runes||[]);
+        var ex=SP.filter(function(s){return s.on&&key(s.runes)===k}).map(function(s){return{id:s.id,name:s.name,desc:s.desc,runes:s.runes}});
+        c.send({t:'res',runes:m.runes,found:ex})}})});
+  NET.lastMap=S.map;NET.lastPins=JSON.stringify(NET.pub());
+};
+NET.join=function(code,retry){
+  code=String(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(!code)return;
+  if(!window.Peer){NET.st('PeerJS konnte nicht geladen werden (Internetverbindung?)');NET.drawNet();return}
+  if(!retry){NET.role='guest';NET.code=code;S.gm=false;S.place=false;S.sel=null;S.map=null;S.pins=[];syncUI();drawMap();drawPanel();drawMagic()}
+  if(NET.peer)try{NET.peer.destroy()}catch(e){}
+  NET.st('Verbinde …');NET.drawNet();
+  var pr=new Peer();NET.peer=pr;
+  function again(ms){setTimeout(function(){if(NET.role==='guest'&&NET.peer===pr&&!(NET.conn&&NET.conn.open))NET.join(code,true)},ms)}
+  pr.on('open',function(){
+    var c=pr.connect('dnd-q-'+code,{reliable:true});NET.conn=c;
+    c.on('open',function(){NET.st('Verbunden ✓');NET.drawNet();c.send({t:'hello'})});
+    c.on('data',function(m){if(!m)return;
+      if(m.t==='map'){S.map=m.map;drawMap()}
+      if(m.t==='pins'){S.pins=m.pins;drawMap();drawPanel()}
+      if(m.t==='res')NET.res(m)});
+    c.on('close',function(){NET.st('Verbindung verloren, versuche erneut …');NET.drawNet();NET.conn=null;again(4000)})});
+  pr.on('error',function(e){
+    NET.st(e.type==='peer-unavailable'?'Raum nicht gefunden. Ist der Spielleiter online und der Code richtig? Versuche es weiter …':'Fehler: '+e.type+'. Versuche es weiter …');
+    NET.drawNet();again(8000)});
+};
+NET.ask=function(){
+  var r=document.getElementById('pRes');if(!r)return;
+  NET.foundList();
+  if(!PSEL.length){r.innerHTML="<p class='mute'>Noch keine Runen gewählt.</p>";return}
+  if(!NET.conn||!NET.conn.open){r.innerHTML="<p class='mute'>Nicht mit dem Spielleiter verbunden.</p>";return}
+  r.innerHTML="<p class='mute'>Prüfe …</p>";
+  NET.conn.send({t:'combo',runes:PSEL.slice()});
+};
+NET.res=function(m){
+  if(key(m.runes||[])!==key(PSEL))return;
+  var r=document.getElementById('pRes');if(!r)return;
+  r.innerHTML="<div>"+PSEL.map(function(i){return chip(i)}).join(' ')+"</div>"+(m.found.length?m.found.map(function(s){return "<div class='ok'><b>"+esc(s.name)+"</b><div class='txt'>"+esc(s.desc)+"</div></div>"}).join(''):"<p class='mute'>Die Runen verbinden sich zu keinem bekannten Zauber.</p>");
+  m.found.forEach(function(s){if(!NET.found.some(function(f){return f.id===s.id}))NET.found.push(s)});
+  try{localStorage.setItem('qk_found2',JSON.stringify(NET.found))}catch(e){}
+  NET.foundList();
+};
+NET.foundList=function(){
+  var f=document.getElementById('pFnd');if(!f)return;
+  f.innerHTML=NET.found.length?NET.found.map(function(s){return "<div class='ok'><b>"+esc(s.name)+"</b> "+s.runes.map(function(i){return chip(i)}).join(' ')+"</div>"}).join(''):"<p class='mute'>Noch nichts entdeckt.</p>";
+};
+NET.drawNet=function(){
+  var n=document.getElementById('netbar'),h='';
+  if(NET.role==='host')h="<b>Raum-Code: "+NET.code+"</b> · "+NET.conns.length+" Spieler verbunden <button id='nCopy'>Einladungslink kopieren</button>";
+  else if(NET.role==='guest')h="Raum <b>"+NET.code+"</b>";
+  else{var lc='';try{lc=localStorage.getItem('qk_last')||''}catch(e){}
+    h="<button id='nHost'>Raum erstellen (Spielleiter)</button> oder <input type='text' id='nCode' placeholder='Raum-Code' value='"+esc2(lc)+"'><button id='nJoin' class='on'>Beitreten</button>"}
+  n.innerHTML=h+" <span class='mute' id='netst'>"+esc(NET.msg)+"</span>";
+  var g=function(i){return document.getElementById(i)};
+  if(g('nHost'))g('nHost').onclick=NET.host;
+  if(g('nJoin'))g('nJoin').onclick=function(){var c=g('nCode').value;try{localStorage.setItem('qk_last',c.toUpperCase())}catch(e){}NET.join(c)};
+  if(g('nCopy'))g('nCopy').onclick=function(){var u=location.href.split('#')[0]+'#'+NET.code;
+    (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(function(){NET.st('Link kopiert ✓')},function(){NET.st(u)})};
+  g('bGm').style.display=NET.role==='guest'?'none':'';
+};
+load();syncUI();drawMap();drawPanel();NET.drawNet();
+if(location.hash.length>1)NET.join(location.hash.slice(1));
+</script>
+</body></html>
