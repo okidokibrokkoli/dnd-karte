@@ -81,16 +81,19 @@ input[type=checkbox]{width:auto}
 .tab{border-radius:6px 6px 0 0}
 .tab.on{background:var(--acc);border-color:var(--acc);color:var(--panel);font-weight:700}
 #tabs{gap:4px}
-.player #tabs{display:none}
-#toasts{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;width:min(92vw,520px);pointer-events:none}
-.toast{pointer-events:auto;cursor:pointer;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);border:3px solid #fff;text-shadow:0 1px 2px rgba(0,0,0,.5);animation:pop .35s ease-out;transition:opacity .4s}
-.toast b{display:block;font:700 24px "Alegreya SC",Georgia,serif;letter-spacing:.02em}
-.toast span{font-size:19px;font-weight:700}
+#toasts{position:absolute;right:22px;top:8px;z-index:50;display:flex;flex-direction:column;align-items:flex-end;gap:6px;width:min(70vw,270px);pointer-events:none}
+.toast{pointer-events:auto;cursor:pointer;color:#fff;padding:6px 12px;border-radius:8px;box-shadow:0 3px 12px rgba(0,0,0,.45);border:2px solid #fff;width:100%;text-shadow:0 1px 2px rgba(0,0,0,.5);animation:pop .35s ease-out;transition:opacity .4s}
+.toast b{display:block;font:700 15px "Alegreya SC",Georgia,serif;letter-spacing:.02em}
+.toast span{font-size:14px;font-weight:700}
 .toast.enter{background:#d9731a}
 .toast.leave{background:#c23a28}
 .toast.out{opacity:0}
 @keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){.toast{animation:none}}
+#cmbL{padding:2px 8px;border-radius:6px}
+.combat #cmbL{background:var(--bad);color:#fff}
+.player .tab{cursor:default}
+main{position:relative}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -151,6 +154,7 @@ input[type=checkbox]{width:auto}
 </aside>
 <main>
   <div id="tabs" class="bar"></div>
+  <div id="toasts" aria-live="assertive"></div>
   <div class="bar">
     <button id="tMove" aria-pressed="true">Figuren bewegen</button>
     <button id="tRul" aria-pressed="false">Lineal</button>
@@ -159,7 +163,7 @@ input[type=checkbox]{width:auto}
     <button id="tSpell" aria-pressed="false">Zauber</button><select id="shape" style="width:auto"><option value="circle">Kreis</option><option value="cone">Kegel</option><option value="line">Strahl (1,5 m / 5 ft breit)</option><option value="square">Würfel</option></select><label class="row">Größe <input id="ssz" type="number" min="1" step="0.5" value="6" style="width:64px"> <span class="un"></span> <span class="ftv" data-for="ssz"></span></label><button id="sclr">Zauber löschen</button>
     <button id="clr">Linie löschen</button>
     <button id="round">Neue Runde</button>
-    <label class="row"><input type="checkbox" id="mel"> Nahkampf <span class="u15"></span></label><label class="row">Einheit <select id="unit" style="width:auto"><option value="m">Meter</option><option value="ft">Fuß (ft)</option></select></label><label class="row" title="Höhenunterschied, der beim Lineal mitgerechnet wird">Lineal Höhe <input id="rh" type="number" step="0.5" value="0" style="width:64px"> <span class="un"></span> <span class="ftv" data-for="rh"></span></label>
+    <label class="row" id="cmbL"><input type="checkbox" id="cmb"> <b>Combat</b></label><label class="row"><input type="checkbox" id="mel"> Nahkampf <span class="u15"></span></label><label class="row">Einheit <select id="unit" style="width:auto"><option value="m">Meter</option><option value="ft">Fuß (ft)</option></select></label><label class="row" title="Höhenunterschied, der beim Lineal mitgerechnet wird">Lineal Höhe <input id="rh" type="number" step="0.5" value="0" style="width:64px"> <span class="un"></span> <span class="ftv" data-for="rh"></span></label>
     <span class="sp"></span>
     <label class="row" for="zoom">Zoom <input id="zoom" type="range" min="0.2" max="2" step="0.05" value="1"></label>
   </div>
@@ -176,14 +180,13 @@ input[type=checkbox]{width:auto}
   </div></div>
 </main>
 </div>
-<div id="toasts" aria-live="assertive"></div>
 <script>
 const $=s=>document.querySelector(s);
-const S={ppm:50,ox:0,oy:0,mode:'euclid',zoom:1,W:1500,H:1000,tokens:[],init:[],snap:'free',mapId:'',enforce:true,melee:false,unit:(()=>{try{return localStorage.getItem('dnd-unit')==='ft'?'ft':'m'}catch(e){return 'm'}})(),tool:'move'};
+const S={ppm:50,ox:0,oy:0,mode:'euclid',zoom:1,W:1500,H:1000,tokens:[],init:[],snap:'free',mapId:'',enforce:true,melee:false,combat:false,unit:(()=>{try{return localStorage.getItem('dnd-unit')==='ft'?'ft':'m'}catch(e){return 'm'}})(),tool:'move'};
 let ruler=null,drag=null,rd=false,route=null,db=null,gm=true,cloud=false,tm;
 let spells=[],sp=null;
-try{const j=JSON.parse(localStorage.getItem('dnd-map')||'null');if(j){S.ppm=j.ppm||50;S.ox=j.ox||0;S.oy=j.oy||0;S.mode=j.mode||'euclid';S.snap=j.snap||'free';S.enforce=j.enforce!==false;S.scenes=j.scenes||null;S.sc=j.sc||null;S.tokens=j.tokens||[];S.init=j.init||[]}}catch(e){}
-const save=()=>{storeScene();if(cloud){clearTimeout(tm);tm=setTimeout(sync,350);if(role!=='host')return}try{localStorage.setItem('dnd-map',JSON.stringify({ppm:S.ppm,ox:S.ox,oy:S.oy,mode:S.mode,snap:S.snap,enforce:S.enforce,tokens:S.tokens,init:S.init,scenes:S.scenes,sc:S.sc}))}catch(e){}};
+try{const j=JSON.parse(localStorage.getItem('dnd-map')||'null');if(j){S.ppm=j.ppm||50;S.ox=j.ox||0;S.oy=j.oy||0;S.mode=j.mode||'euclid';S.snap=j.snap||'free';S.enforce=j.enforce!==false;S.combat=!!j.combat;S.scenes=j.scenes||null;S.sc=j.sc||null;S.tokens=j.tokens||[];S.init=j.init||[]}}catch(e){}
+const save=()=>{storeScene();if(cloud){clearTimeout(tm);tm=setTimeout(sync,350);if(role!=='host')return}try{localStorage.setItem('dnd-map',JSON.stringify({ppm:S.ppm,ox:S.ox,oy:S.oy,mode:S.mode,snap:S.snap,enforce:S.enforce,combat:S.combat,tokens:S.tokens,init:S.init,scenes:S.scenes,sc:S.sc}))}catch(e){}};
 const fmt=n=>n.toLocaleString('de-DE',{maximumFractionDigits:1});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const dist=(a,b,dh=0)=>{const dx=Math.abs(a.x-b.x),dy=Math.abs(a.y-b.y);dh=Math.abs(dh);return S.mode==='grid'?Math.max(dx,dy,dh):Math.hypot(dx,dy,dh)};
@@ -191,7 +194,7 @@ const cost=(t,a,b)=>dist(a,b)*(t.rough?2:1);
 const ft=m=>Math.round(m*3.28084).toLocaleString('de-DE');
 const mf=m=>S.unit==='ft'?ft(m)+' ft ('+fmt(m)+' m)':fmt(m)+' m ('+ft(m)+' ft)';
 const K=3.28084,cb=v=>S.unit==='ft'?v/K:v,iv=m=>S.unit==='ft'?Math.round(m*K):+(+m).toFixed(2),stp=()=>S.unit==='ft'?5:.5,uo=m=>S.unit==='ft'?fmt(m)+' m':ft(m)+' ft';
-const tt=(t,total,bad)=>`${t.name}: ${mf(total)} von ${mf(t.speed)}`+(bad?` · ${mf(total-t.speed)} zu weit`:'');
+const tt=(t,total,bad)=>!S.combat?`${t.name}: ${mf(total)}`:`${t.name}: ${mf(total)} von ${mf(t.speed)}`+(bad?` · ${mf(total-t.speed)} zu weit`:'');
 const px=m=>({x:S.ox+m.x*S.ppm,y:S.oy+m.y*S.ppm});
 const tokSize=()=>Math.max(28,S.ppm*.9);
 function toM(e){const r=$('#stage').getBoundingClientRect();const x=(e.clientX-r.left)/S.zoom,y=(e.clientY-r.top)/S.zoom;
@@ -206,7 +209,7 @@ function place(el,m,dy){const p=px(m);el.style.display='block';el.style.left=p.x
 function layout(){
   const st=$('#stage');st.style.width=S.W+'px';st.style.height=S.H+'px';st.style.transform=`scale(${S.zoom})`;
   const sz=$('#sizer');sz.style.width=S.W*S.zoom+'px';sz.style.height=S.H*S.zoom+'px';
-  $('#enf').checked=S.enforce;drawSpells();const g=$('#grid');g.style.backgroundSize=`${S.ppm}px ${S.ppm}px`;g.style.backgroundPosition=`${S.ox}px ${S.oy}px`;
+  $('#enf').checked=S.enforce;$('#cmb').checked=!!S.combat;document.body.classList.toggle('combat',!!S.combat);drawSpells();const g=$('#grid');g.style.backgroundSize=`${S.ppm}px ${S.ppm}px`;g.style.backgroundPosition=`${S.ox}px ${S.oy}px`;
   const o=$('#ovl');o.setAttribute('width',S.W);o.setAttribute('height',S.H);
   drawRuler()}
 function drawRuler(){
@@ -214,7 +217,7 @@ function drawRuler(){
   $('#rul').innerHTML=seg(ruler.a,ruler.b,'#ffd34d');
   const mid={x:(ruler.a.x+ruler.b.x)/2,y:(ruler.a.y+ruler.b.y)/2};
   $('#rl').textContent=mf(dist(ruler.a,ruler.b,cb(parseFloat($('#rh').value)||0)));place($('#rl'),mid,-10)}
-const over=t=>t.used>t.speed+1e-9;
+const over=t=>S.combat&&t.used>t.speed+1e-9;
 function renderTokens(){
   const box=$('#toks');box.innerHTML='';const s=tokSize();
   S.tokens.forEach(t=>{
@@ -228,14 +231,14 @@ function renderTokens(){
       drag={t,el,cx:e.clientX,cy:e.clientY,start:{x:t.x,y:t.y},cur:{x:t.x,y:t.y}};el.style.cursor='grabbing'});
     el.addEventListener('pointermove',e=>{
       if(!drag||drag.el!==el)return;const p=limit(t,drag.start,toM(e));drag.cur=p;setPos(el,p);drawMelee({id:t.id,x:p.x,y:p.y});
-      const d=cost(t,drag.start,p),total=t.used+d,bad=total>t.speed+1e-9;
+      const d=cost(t,drag.start,p),total=t.used+d,bad=S.combat&&total>t.speed+1e-9;
       $('#path').innerHTML=seg(drag.start,p,bad?'#ff5a45':'#ffffff',true);
       const tip=$('#tip');tip.className='tag'+(bad?' bad':'');
       tip.textContent=`${t.name}: ${fmt(total)} von ${fmt(t.speed)} m`+(bad?` · ${fmt(total-t.speed)} m zu weit`:'');
       tip.textContent=tt(t,total,bad);place(tip,p,-s/2-8);el.classList.toggle('over',bad)});
     const end=ev=>{
       if(!drag||drag.el!==el)return;const d=cost(t,drag.start,drag.cur),moved=Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)>5;
-      if(moved&&d>0){meleeCheck(t,[drag.start,drag.cur]);t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});t.used+=d;t.x=drag.cur.x;t.y=drag.cur.y}else if(!moved){t.sel=!t.sel;el.classList.toggle('sel',!!t.sel)}setPos(el,t);
+      if(moved&&d>0){meleeCheck(t,[drag.start,drag.cur]);t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});if(S.combat)t.used+=d;t.x=drag.cur.x;t.y=drag.cur.y}else if(!moved){t.sel=!t.sel;el.classList.toggle('sel',!!t.sel)}setPos(el,t);
       drag=null;el.style.cursor='';$('#path').innerHTML='';$('#tip').style.display='none';drawMelee();
       el.classList.toggle('over',over(t));save();renderList()};
     el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
@@ -297,7 +300,7 @@ function routeLen(pts){let s=0;for(let i=1;i<pts.length;i++)s+=dist(pts[i-1],pts
 function startRoute(t){route={t,pts:[{x:t.x,y:t.y}],hover:{x:t.x,y:t.y}};$('#stage').classList.add('routing');$('#rOk').hidden=false;$('#rNo').hidden=false;drawRoute()}
 function drawRoute(){
   if(!route){$('#path').innerHTML='';$('#tip').style.display='none';return}
-  const t=route.t,pts=route.pts.concat([route.hover]),total=t.used+routeLen(pts),bad=total>t.speed+1e-9;
+  const t=route.t,pts=route.pts.concat([route.hover]),total=t.used+routeLen(pts),bad=S.combat&&total>t.speed+1e-9;
   let h='';for(let i=1;i<pts.length;i++)h+=seg(pts[i-1],pts[i],bad?'#ff5a45':'#ffffff',i===pts.length-1);
   $('#path').innerHTML=h;
   const tip=$('#tip');tip.className='tag'+(bad?' bad':'');
@@ -305,7 +308,7 @@ function drawRoute(){
   tip.textContent=tt(t,total,bad);place(tip,route.hover,-tokSize()/2-8)}
 function confirmRoute(){
   if(!route)return;const t=route.t,pts=route.pts,last=pts[pts.length-1],len=routeLen(pts);
-  if(len>0){meleeCheck(t,pts);t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});t.used+=len;t.x=last.x;t.y=last.y}
+  if(len>0){meleeCheck(t,pts);t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:t.h||0});if(S.combat)t.used+=len;t.x=last.x;t.y=last.y}
   endRoute();save();renderTokens();renderList()}
 function cancelRoute(){if(route)endRoute()}
 function endRoute(){route=null;$('#stage').classList.remove('routing');$('#rOk').hidden=true;$('#rNo').hidden=true;drawRoute()}
@@ -330,7 +333,7 @@ $('#ini').addEventListener('change',e=>{
 const sent={},q={};
 const tdoc=t=>({id:t.id,name:t.name,color:t.color,speed:t.speed,x:t.x,y:t.y,used:t.used,dead:!!t.dead,rough:!!t.rough,h:t.h||0,sel:!!t.sel,p:t.p||{},hist:t.hist||[]});
 const idoc=i=>({id:i.id,name:i.name,v:i.v});
-const sd=o=>({ppm:o.ppm,ox:o.ox,oy:o.oy,mode:o.mode,snap:o.snap||'free',W:o.W,H:o.H,enforce:o.enforce!==false});
+const sd=o=>({ppm:o.ppm,ox:o.ox,oy:o.oy,mode:o.mode,snap:o.snap||'free',W:o.W,H:o.H,enforce:o.enforce!==false,combat:!!o.combat,scn:(o.scn||o.scenes||[]).map(c=>({id:c.id,name:c.name})),sc:o.sc||null});
 let role='local',peer=null,conns=[],hostConn=null,mapBlob=null;
 function netSend(m,except){
   if(role==='host')conns.forEach(c=>{if(c!==except&&c.open)c.send(m)});
@@ -352,9 +355,10 @@ function applyInit(docs){
   S.init.forEach(i=>sent['init/'+i.id]=JSON.stringify(idoc(i)));renderIni()}
 function applySet(x){
   if(!x)return;
-  Object.assign(S,{ppm:x.ppm,ox:x.ox,oy:x.oy,mode:x.mode,snap:x.snap||'free',enforce:x.enforce!==false,W:x.W||S.W,H:x.H||S.H});
+  if(x.scn){S.scn=x.scn;if(x.sc)S.sc=x.sc}
+  Object.assign(S,{ppm:x.ppm,ox:x.ox,oy:x.oy,mode:x.mode,snap:x.snap||'free',enforce:x.enforce!==false,combat:!!x.combat,W:x.W||S.W,H:x.H||S.H});
   $('#ppm').value=S.ppm;$('#ox').value=S.ox;$('#oy').value=S.oy;$('#mode').value=S.mode;$('#snap').value=S.snap;
-  layout();renderTokens()}
+  renderTabs();layout();renderTokens()}
 function applyPut(p,d){
   const c=p.split('/')[0],id=p.slice(c.length+1);
   if(c==='campaign'){applySet(d);return}
@@ -382,8 +386,8 @@ function showToast(e){
   d.innerHTML=enter?`<b>Entering Melee Range</b><span>${esc(e.a)} → ${esc(e.b)}</span>`
     :`<b>Leaving Opportunity Range</b><span>${esc(e.a)} verlässt die Reichweite von ${esc(e.b)}</span>`;
   const rm=()=>{d.classList.add('out');setTimeout(()=>d.remove(),400)};
-  d.addEventListener('click',rm);$('#toasts').appendChild(d);setTimeout(rm,7000)}
-function meleeCheck(t,pts){
+  d.addEventListener('click',rm);const tb=$('#toasts');tb.style.top=($('#pan').offsetTop+8)+'px';tb.appendChild(d);setTimeout(rm,6000)}
+function meleeCheck(t,pts){if(!S.combat)return;
   if(t.dead)return;
   const R=1.5,ev=[];
   S.tokens.forEach(o=>{
@@ -432,7 +436,7 @@ function joinRoom(){
     const c=pr.connect(PRE+code,{reliable:true});
     c.on('open',()=>{
       peer=pr;hostConn=c;role='client';cloud=true;gm=false;
-      document.body.classList.add('player');
+      document.body.classList.add('player');$('#cmb').disabled=true;
       [$('#file'),$('#ppm')].forEach(e=>e.closest('section').hidden=true);
       [$('#in'),$('#iadd')].forEach(e=>e.closest('.row').hidden=true);
       netUI(code);netMsg('Verbunden mit dem Spielleiter.')});
@@ -451,8 +455,9 @@ const idb=(()=>{let d;const open=()=>d||(d=new Promise((res,rej)=>{const r=index
 const scene=id=>S.scenes.find(x=>x.id===id);
 function storeScene(){const c=S.scenes&&scene(S.sc);if(c)Object.assign(c,{ppm:S.ppm,ox:S.ox,oy:S.oy,W:S.W,H:S.H})}
 function renderTabs(){
-  $('#tabs').innerHTML=S.scenes.map(c=>`<button class="tab${c.id===S.sc?' on':''}" data-id="${c.id}">${esc(c.name)}</button>`).join('')
-    +'<button id="addSc">+ Neue Karte</button><button id="renSc">Umbenennen</button><button id="delSc">Löschen</button>'}
+  const cl=role==='client',list=cl?(S.scn||[]):S.scenes;
+  $('#tabs').innerHTML=list.map(c=>`<button class="tab${c.id===S.sc?' on':''}" data-id="${c.id}">${esc(c.name)}</button>`).join('')
+    +(cl?'':'<button id="addSc">+ Neue Karte</button><button id="renSc">Umbenennen</button><button id="delSc">Löschen</button>')}
 async function gotoScene(id){
   if(id===S.sc||!scene(id))return;
   storeScene();const old=S.sc;
@@ -487,14 +492,14 @@ function initScenes(){
   if(!S.scenes||!S.scenes.length){S.scenes=[{id:'s1',name:'Karte 1',ppm:S.ppm,ox:S.ox,oy:S.oy,W:S.W,H:S.H}];S.sc='s1'}
   else{const c=scene(S.sc)||S.scenes[0];S.sc=c.id;Object.assign(S,{ppm:c.ppm,ox:c.ox,oy:c.oy,W:c.W,H:c.H})}
   renderTabs();
-  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||role==='client')return;
     if(b.classList.contains('tab'))gotoScene(b.dataset.id);
     else if(b.id==='addSc')addScene();else if(b.id==='renSc')renameScene();else if(b.id==='delSc')delScene()});
   idb.get(S.sc).then(b=>{if(b){mapBlob=b;showMapBlob(b)}}).catch(()=>{})}
 initScenes();
 nextColor();layout();renderTokens();renderList();renderIni();initNet();
-function limit(t,s,p){if(!S.enforce)return p;const R=t.speed-t.used,d=cost(t,s,p);if(d<=R+1e-9||d===0)return p;const f=Math.max(0,R)/d;return{x:s.x+(p.x-s.x)*f,y:s.y+(p.y-s.y)*f}}
-function rlim(p){if(!S.enforce||!route)return p;const t=route.t,l=route.pts[route.pts.length-1],d=dist(l,p)*(t.rough?2:1),R=t.speed-t.used-routeLen(route.pts);if(d<=R+1e-9||d===0)return p;const f=Math.max(0,R)/d;return{x:l.x+(p.x-l.x)*f,y:l.y+(p.y-l.y)*f}}
+function limit(t,s,p){if(!S.enforce||!S.combat)return p;const R=t.speed-t.used,d=cost(t,s,p);if(d<=R+1e-9||d===0)return p;const f=Math.max(0,R)/d;return{x:s.x+(p.x-s.x)*f,y:s.y+(p.y-s.y)*f}}
+function rlim(p){if(!S.enforce||!S.combat||!route)return p;const t=route.t,l=route.pts[route.pts.length-1],d=dist(l,p)*(t.rough?2:1),R=t.speed-t.used-routeLen(route.pts);if(d<=R+1e-9||d===0)return p;const f=Math.max(0,R)/d;return{x:l.x+(p.x-l.x)*f,y:l.y+(p.y-l.y)*f}}
 function drawMelee(ov){$('#melee').innerHTML=!S.melee?'':S.tokens.filter(t=>!t.dead).map(t=>{const p=px(ov&&ov.id===t.id?ov:t);return `<circle cx="${p.x}" cy="${p.y}" r="${1.5*S.ppm}" class="ml"/>`}).join('')}
 function drawSpells(){$('#spl').innerHTML=spells.map(s=>{
   const A=px(s.a),L=s.size*S.ppm;
@@ -505,6 +510,7 @@ function drawSpells(){$('#spl').innerHTML=spells.map(s=>{
   const pts=s.k==='cone'?[A,{x:E.x+nx*w,y:E.y+ny*w},{x:E.x-nx*w,y:E.y-ny*w}]:[{x:A.x+nx*w,y:A.y+ny*w},{x:E.x+nx*w,y:E.y+ny*w},{x:E.x-nx*w,y:E.y-ny*w},{x:A.x-nx*w,y:A.y-ny*w}];
   return `<polygon points="${pts.map(p=>p.x+','+p.y).join(' ')}" class="sp"/>`}).join('')}
 $('#enf').onchange=e=>{S.enforce=e.target.checked;save()};
+$('#cmb').onchange=e=>{S.combat=e.target.checked;if(S.combat)S.tokens.forEach(t=>{t.used=0;t.hist=[]});save();layout();renderTokens();renderList()};
 $('#mel').onchange=e=>{S.melee=e.target.checked;drawMelee()};
 $('#rh').oninput=drawRuler;
 $('#tSpell').onclick=()=>tool('spell');
@@ -512,14 +518,27 @@ $('#sclr').onclick=()=>{spells=[];drawSpells()};
 st.addEventListener('pointerdown',e=>{if(S.tool!=='spell')return;st.setPointerCapture(e.pointerId);const p=toM(e);sp={k:$('#shape').value,size:Math.max(.5,cb(parseFloat($('#ssz').value))||6),a:p,b:p};spells.push(sp);drawSpells()});
 st.addEventListener('pointermove',e=>{if(!sp)return;const p=toM(e);if(sp.k==='circle'||sp.k==='square')sp.a=p;else sp.b=p;drawSpells()});
 st.addEventListener('pointerup',()=>{sp=null});
+function spHit(c,x,y){
+  const A=px(c.a),L=c.size*S.ppm;
+  if(c.k==='circle')return Math.hypot(x-A.x,y-A.y)<=L;
+  if(c.k==='square')return Math.abs(x-A.x)<=L/2&&Math.abs(y-A.y)<=L/2;
+  const B=px(c.b);let dx=B.x-A.x,dy=B.y-A.y,n=Math.hypot(dx,dy);if(n<1){dx=1;dy=0;n=1}dx/=n;dy/=n;
+  const u=(x-A.x)*dx+(y-A.y)*dy,v=-(x-A.x)*dy+(y-A.y)*dx;
+  if(u<0||u>L)return false;
+  return c.k==='cone'?Math.abs(v)<=u/2:Math.abs(v)<=.75*S.ppm}
+st.addEventListener('contextmenu',e=>{
+  const r=st.getBoundingClientRect(),x=(e.clientX-r.left)/S.zoom,y=(e.clientY-r.top)/S.zoom;
+  for(let i=spells.length-1;i>=0;i--)if(spHit(spells[i],x,y)){spells.splice(i,1);drawSpells();e.preventDefault();return}
+  if(ruler){const A=px(ruler.a),B=px(ruler.b),vx=B.x-A.x,vy=B.y-A.y,l2=vx*vx+vy*vy||1,k=Math.max(0,Math.min(1,((x-A.x)*vx+(y-A.y)*vy)/l2));
+    if(Math.hypot(x-(A.x+k*vx),y-(A.y+k*vy))<=12/S.zoom){ruler=null;drawRuler();e.preventDefault()}}});
 $('#list').addEventListener('change',e=>{
   const a=e.target.dataset.act;if(!['dead','rough','h'].includes(a))return;
   const t=S.tokens.find(x=>x.id==e.target.closest('.card').dataset.id);if(!t)return;
   if(a==='dead')t.dead=e.target.checked;
   if(a==='rough')t.rough=e.target.checked;
   if(a==='h'){let nh=cb(parseFloat(e.target.value)||0);const mul=t.rough?2:1,old=t.h||0;let c=Math.abs(nh-old)*mul;
-    if(S.enforce&&c>t.speed-t.used+1e-9){const R=Math.max(0,t.speed-t.used);nh=old+Math.sign(nh-old)*R/mul;c=R}
-    if(nh!==old){t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:old});t.used+=c;t.h=nh}}
+    if(S.enforce&&S.combat&&c>t.speed-t.used+1e-9){const R=Math.max(0,t.speed-t.used);nh=old+Math.sign(nh-old)*R/mul;c=R}
+    if(nh!==old){t.hist=t.hist||[];t.hist.push({x:t.x,y:t.y,used:t.used,h:old});if(S.combat)t.used+=c;t.h=nh}}
   save();renderTokens();renderList()});
 function updFt(){document.querySelectorAll('.ftv').forEach(s=>{const m=cb(parseFloat($('#'+s.dataset.for).value)||0);s.textContent='('+uo(m)+')'})}
 function updUnit(){
